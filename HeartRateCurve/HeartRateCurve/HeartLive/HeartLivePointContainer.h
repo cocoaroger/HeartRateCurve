@@ -1,21 +1,23 @@
 //
-//  HeartLive.h
+//  HeartLivePointContainer.h
 //  HeartRateCurve
 //
-//  Created by IOS－001 on 14-4-23.
-//  Copyright (c) 2014年 N/A. All rights reserved.
+//  Created by roger wu on 2021/6/26.
+//  Copyright © 2021 N/A. All rights reserved.
 //
 
-#import <UIKit/UIKit.h>
+#import <Foundation/Foundation.h>
 
-@interface PointContainer : NSObject
+NS_ASSUME_NONNULL_BEGIN
+
+@interface HeartLivePointContainer : NSObject
 
 @property (nonatomic , readonly) NSInteger numberOfRefreshElements;
 @property (nonatomic , readonly) NSInteger numberOfTranslationElements;
 @property (nonatomic , readonly) CGPoint *refreshPointContainer;
 @property (nonatomic , readonly) CGPoint *translationPointContainer;
 
-+ (PointContainer *)sharedContainer;
++ (HeartLivePointContainer *)sharedContainer;
 
 //刷新变换
 - (void)addPointAsRefreshChangeform:(CGPoint)point;
@@ -24,11 +26,4 @@
 
 @end
 
-
-
-@interface HeartLive : UIView
-
-- (void)fireDrawingWithPoints:(CGPoint *)points pointsCount:(NSInteger)count;
-
-@end
-
+NS_ASSUME_NONNULL_END

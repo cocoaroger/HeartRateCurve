@@ -8,13 +8,22 @@
 
 #import "HomeViewController.h"
 #import "HeartLive.h"
+#import "HeartLive2.h"
+#import "HeartLive3.h"
+#import "HeartLivePointContainer.h"
 
 @interface HomeViewController ()
 
 @property (nonatomic , strong) NSArray *dataSource;
+@property (nonatomic , strong) NSMutableArray *showDataSource;
+@property (assign, nonatomic) NSInteger currentIndex;
 
 @property (nonatomic , strong) HeartLive *refreshMoniterView;
-@property (nonatomic , strong) HeartLive *translationMoniterView;
+@property (nonatomic , strong) HeartLive2 *translationMoniterView;
+@property (nonatomic , strong) HeartLive3 *monitorView3;
+@property (strong, nonatomic) HeartLivePointContainer *pointContainer;
+@property (strong, nonatomic) UIScrollView *scrollView;
+@property (strong, nonatomic) UIScrollView *scrollView2;
 
 @end
 
@@ -30,14 +39,42 @@
     return _refreshMoniterView;
 }
 
-- (HeartLive *)translationMoniterView
+- (HeartLive2 *)translationMoniterView
 {
     if (!_translationMoniterView) {
         CGFloat xOffset = 10;
-        _translationMoniterView = [[HeartLive alloc] initWithFrame:CGRectMake(xOffset, CGRectGetMaxY(self.refreshMoniterView.frame) + 10, CGRectGetWidth(self.view.frame) - 2 * xOffset, 200)];
+        _translationMoniterView = [[HeartLive2 alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.frame) - 2 * xOffset, 200)];
         _translationMoniterView.backgroundColor = [UIColor blackColor];
     }
     return _translationMoniterView;
+}
+
+- (HeartLive3 *)monitorView3 {
+    if (!_monitorView3) {
+        CGFloat xOffset = 10;
+        _monitorView3 = [[HeartLive3 alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.frame), CGRectGetHeight(self.view.frame))];
+        _monitorView3.backgroundColor = [UIColor blackColor];
+    }
+    return _monitorView3;
+}
+
+- (UIScrollView *)scrollView
+{
+    if (!_scrollView) {
+        CGFloat xOffset = 10;
+        _scrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(xOffset, CGRectGetMaxY(self.refreshMoniterView.frame) + 10, CGRectGetWidth(self.view.frame) - 2 * xOffset, 200)];
+        _scrollView.backgroundColor = [UIColor blackColor];
+    }
+    return _scrollView;
+}
+
+- (UIScrollView *)scrollView2
+{
+    if (!_scrollView2) {
+        _scrollView2 = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.frame), CGRectGetHeight(self.view.frame))];
+        _scrollView2.backgroundColor = [UIColor blackColor];
+    }
+    return _scrollView2;
 }
 
 - (id)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil
@@ -56,8 +93,18 @@
     self.edgesForExtendedLayout = UIRectEdgeNone;
     self.title = @"心电图";
     
+    [self.view addSubview:self.scrollView];
     [self.view addSubview:self.refreshMoniterView];
-    [self.view addSubview:self.translationMoniterView];
+    [self.view addSubview:self.scrollView2];
+    
+    [self.scrollView addSubview:self.translationMoniterView];
+    [self.scrollView2 addSubview:self.monitorView3];
+    
+    self.pointContainer = [HeartLivePointContainer sharedContainer];
+    self.showDataSource = [NSMutableArray new];
+    
+    _scrollView.hidden = YES;
+    _refreshMoniterView.hidden = YES;
     
     self.view.backgroundColor = [UIColor lightGrayColor];
     void (^createData)(void) = ^{
@@ -70,6 +117,9 @@
         }];
         self.dataSource = tempData;
         [self createWorkDataSourceWithTimeInterval:0.01];
+        self.scrollView.contentSize = CGSizeMake(tempData.count, 200);
+        [self.translationMoniterView refreshWithDataSoure:tempData];
+        [self.monitorView3 refreshWithDataSoure:tempData];
     };
     createData();
 }
@@ -86,80 +136,16 @@
 - (void)createWorkDataSourceWithTimeInterval:(NSTimeInterval )timeInterval
 {
     [NSTimer scheduledTimerWithTimeInterval:timeInterval target:self selector:@selector(timerRefresnFun) userInfo:nil repeats:YES];
-    [NSTimer scheduledTimerWithTimeInterval:timeInterval target:self selector:@selector(timerTranslationFun) userInfo:nil repeats:YES];
 }
 
 //刷新方式绘制
 - (void)timerRefresnFun
 {
-    [[PointContainer sharedContainer] addPointAsRefreshChangeform:[self bubbleRefreshPoint]];
-    
-    [self.refreshMoniterView fireDrawingWithPoints:[PointContainer sharedContainer].refreshPointContainer pointsCount:[PointContainer sharedContainer].numberOfRefreshElements];
+    if (_currentIndex == _dataSource.count) {
+        _currentIndex = 0;
+    }
+    [self.showDataSource addObject:_dataSource[_currentIndex]];
+    _currentIndex ++;
+    [self.refreshMoniterView refreshWithDataSoure:_showDataSource];
 }
-
-//平移方式绘制
-- (void)timerTranslationFun
-{
-    [[PointContainer sharedContainer] addPointAsTranslationChangeform:[self bubbleTranslationPoint]];
-    
-    [self.translationMoniterView fireDrawingWithPoints:[[PointContainer sharedContainer] translationPointContainer] pointsCount:[[PointContainer sharedContainer] numberOfTranslationElements]];
-    
-    //    printf("当前元素个数:%2d->",[PointContainer sharedContainer].numberOfElements);
-    //    for (int k = 0; k != [PointContainer sharedContainer].numberOfElements; ++k) {
-    //        printf("(%4.0f,%4.0f)",[PointContainer sharedContainer].pointContainer[k].x,[PointContainer sharedContainer].pointContainer[k].y);
-    //    }
-    //    putchar('\n');
-    
-}
-
-#pragma mark -
-#pragma mark - DataSource
-
-- (CGPoint)bubbleRefreshPoint
-{
-    static NSInteger dataSourceCounterIndex = -1;
-    dataSourceCounterIndex ++;
-    dataSourceCounterIndex %= [self.dataSource count];
-    
-    
-    NSInteger pixelPerPoint = 1;
-    static NSInteger xCoordinateInMoniter = 0;
-    
-    CGPoint targetPointToAdd = (CGPoint){xCoordinateInMoniter,[self.dataSource[dataSourceCounterIndex] integerValue] * 0.5 + 120};
-    xCoordinateInMoniter += pixelPerPoint;
-    xCoordinateInMoniter %= (int)(CGRectGetWidth(self.translationMoniterView.frame));
-    
-    //    NSLog(@"吐出来的点:%@",NSStringFromCGPoint(targetPointToAdd));
-    return targetPointToAdd;
-}
-
-- (CGPoint)bubbleTranslationPoint
-{
-    static NSInteger dataSourceCounterIndex = -1;
-    dataSourceCounterIndex ++;
-    dataSourceCounterIndex %= [self.dataSource count];
-    
-    
-    NSInteger pixelPerPoint = 1;
-    static NSInteger xCoordinateInMoniter = 0;
-    
-    CGPoint targetPointToAdd = (CGPoint){xCoordinateInMoniter,[self.dataSource[dataSourceCounterIndex] integerValue] * 0.5 + 120};
-    xCoordinateInMoniter += pixelPerPoint;
-    xCoordinateInMoniter %= (int)(CGRectGetWidth(self.translationMoniterView.frame));
-    
-    //    NSLog(@"吐出来的点:%@",NSStringFromCGPoint(targetPointToAdd));
-    return targetPointToAdd;
-}
-
-/*
- #pragma mark - Navigation
- 
- // In a storyboard-based application, you will often want to do a little preparation before navigation
- - (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender
- {
- // Get the new view controller using [segue destinationViewController].
- // Pass the selected object to the new view controller.
- }
- */
-
 @end
